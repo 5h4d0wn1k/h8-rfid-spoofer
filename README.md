@@ -3,140 +3,94 @@
 > or hold explicit written authorization to assess**. Unauthorized use is
 > prohibited and may be illegal. Read [ETHICS.md](ETHICS.md) and
 > [SCOPE.md](SCOPE.md) before use. Use at your own risk; **AS IS**, no warranty.
+
 # H8 — RFID/NFC Spoofer
 
-MIFARE Classic RFID reader, cloner, and emulator using ESP32 + RC522.
+**RFID emulation and cloning toolkit** by **5h4d0wn1k** for **physical security
+research** on cards you own: a MIFARE Classic 1K/4K reader, cloner and
+emulator on an ESP32 + RC522 (MFRC522), plus a simulation-only host helper and
+card fixtures for offline study. Bench-scoped — never aimed at access systems
+or cards you don't own.
 
-## Overview
+## Why study RFID emulation
 
-This project implements a standalone RFID/NFC tool that:
-- Reads MIFARE Classic 1K/4K card UIDs and block data
-- Dumps full sector contents with key management
-- Clones card data to blank MIFARE tags
-- Provides serial replay emulation mode
-- Supports all 16 sectors with sector trailer awareness
+MIFARE Classic cards are everywhere — office doors, lockers, campus passes —
+and their generations-proven cryptographic weaknesses are the canonical
+"real-world crypto failure" lesson. This project teaches the physical layer:
+how the RC522 authenticates to a card with key A/B, how sectors and trailers
+are organized, and how a dump maps to a clone. The ESP32 firmware reads,
+dumps and clones MIFARE data over SPI; the host helper formats card dumps and
+simulates emulation offline with no RF field generated. All experiments stay
+on your own bench hardware. See [ETHICS.md](ETHICS.md) and [SCOPE.md](SCOPE.md).
 
-## Hardware
+## Features
 
-| Component | Connection | Role |
-|-----------|------------|------|
-| ESP32 NodeMCU | Main board | SPI master, serial interface |
-| RC522 (MFRC522) | HSPI (D5/D18/D19/D23) | 13.56 MHz RFID reader |
+- **MIFARE Classic reading** — authenticate with key A/B, read UIDs and block
+  data for 1K/4K/MINI/Ultralight tag types (`firmware/h8_rfid_spoofer/`).
+- **Full sector dump** — all 16 sectors with sector-trailer awareness and
+  key management.
+- **Cloning** — write saved data to blank MIFARE tags.
+- **Serial replay emulation** — `emulate` command streams a saved dump in
+  replay mode.
+- **Serial command interface** — `read`, `clone`, `dump`, `emulate`, `keys`
+  over the ESP32 serial console.
+- **Simulation-only host helper** — `python3 host/h8_cli.py --demo` formats
+  dump files and simulates UID emulation offline (no RF generated), exit `0`.
+- **Card fixtures** — offline card-dump corpus in `fixtures/cards.txt`.
 
-## Wiring
+## Quickstart
 
-```
-RC522 Module (HSPI):
-  SDA  → D5  (GPIO5)
-  SCK  → D18 (GPIO18) [default HSPI]
-  MOSI → D23 (GPIO23) [default HSPI]
-  MISO → D19 (GPIO19) [default HSPI]
-  RST  → D27 (GPIO27)
-  3.3V → 3.3V
-  GND  → GND
-```
+### Firmware (ESP32 + RC522)
 
-## Serial Commands
-
-| Command | Description |
-|---------|-------------|
-| `read` | Scan and dump card data |
-| `clone` | Write saved data to blank card |
-| `dump` | Display saved card data |
-| `emulate` | Serial replay mode |
-| `keys` | Show default key table |
-
-## Serial Output
-
-```
-=== H8 — RFID Spoofer ===
-RC522 detected (v0x92)
-
-[+] Scanning...
-╔══════════════════════════════════════════╗
-║       H8 — RFID Spoofer — Scan          ║
-╚══════════════════════════════════════════╝
-  UID:       A1:B2:C3:D4
-  Type:      MIFARE 1K
-```
-
-## Build & Flash
+Prerequisites: ESP32 NodeMCU, MFRC522 (RC522) module, and the MFRC522 Arduino
+library.
 
 ```bash
-# Using Arduino CLI
-arduino-cli compile --fqbn esp32:esp32:esp32 firmware/h8_rfid_spoofer.ino
-arduino-cli upload --fqbn esp32:esp32:esp32 --port /dev/ttyUSB0 firmware/h8_rfid_spoofer.ino
+arduino-cli compile --fqbn esp32:esp32:esp32 firmware/h8_rfid_spoofer
+arduino-cli upload --fqbn esp32:esp32:esp32 --port /dev/ttyUSB0 firmware/h8_rfid_spoofer
 ```
 
-## Legal Disclaimer
+**Wiring (HSPI):** RC522 `SDA→D5`, `SCK→D18`, `MOSI→D23`, `MISO→D19`,
+`RST→D27`, `3.3V→3.3V`, `GND→GND`.
 
-## IMPORTANT: Read before use.
+### Host helper (offline)
 
-This project is provided for **educational and authorized security testing purposes only**.
+```bash
+# Format bundled card dumps and simulate emulation, exit 0
+python3 host/h8_cli.py --demo
 
-### Authorization Requirements
-- You MUST have explicit written permission from the card/system owner before using this tool
-- Unauthorized access to RFID-protected systems is illegal under federal and state laws
-- This tool should ONLY be used on systems you own or have written authorization to test
+# Analyze your own dump file
+python3 host/h8_cli.py --file fixtures/cards.txt
 
-### Legal Framework
-- **Computer Fraud and Abuse Act (CFAA)**: Unauthorized access to computer systems is a federal crime
-- **Wiretap Act (18 U.S.C. § 2511)**: Interception of electronic communications without consent is illegal
-- **State Laws**: Many states have additional computer crime and wiretapping statutes
-- **GDPR/CCPA**: Data collection may be subject to privacy regulations
+# Run the offline test suite
+python3 -m unittest discover -s tests
+```
 
-### Acceptable Use
-- Testing security of your own RFID systems
-- Authorized penetration testing with written scope
-- Academic research in controlled lab environments
-- Security education and training
+## Project structure
 
-### Prohibited Use
-- Cloning access cards without authorization
-- Bypassing physical security controls illegally
-- Any activity that violates applicable laws or regulations
-- Commercial use without proper licensing
+```
+firmware/h8_rfid_spoofer/h8_rfid_spoofer.ino   # ESP32 + RC522 firmware
+host/h8_cli.py                                 # simulation-only card-dump helper
+host/hw_common.py                              # shared hardware helpers
+fixtures/cards.txt                             # offline card-dump corpus
+tests/                                         # unittest coverage
+```
 
-### No Warranty
-This software is provided "AS IS" without warranty of any kind. The author is not responsible for any misuse or damage caused by this software.
+## Documentation
 
-### Responsible Disclosure
-If you discover vulnerabilities using this tool, follow responsible disclosure practices:
-1. Report to the vendor/owner privately
-2. Allow reasonable time for remediation
-3. Do not exploit beyond proof of concept
+- [firmware README](firmware/README.md) — build and bench details.
+- [ETHICS.md](ETHICS.md) — acceptable and prohibited use.
+- [SCOPE.md](SCOPE.md) — authorized target scope and shielded-lab rules.
+- [SECURITY.md](SECURITY.md) — responsible disclosure.
 
-## Live Lab Test Plan
+## Contributing
 
-Run ONLY on an isolated, authorized own-lab bench against devices, networks,
-and spectrum **you own**. No third-party callers, bystanders, or spectrum users
-may be within range of any test transmission.
-
-1. **Isolate** - Put the DUT in a shielded/Faraday enclosure or a room with no
-   third-party devices in range. Use attenuators on any transmit path.
-2. **Own devices only** - Every target (AP, remote, tag, GPS module, drone FC,
-   receiver) must be your own hardware.
-3. **Lowest power, shortest duration** - Start at minimum TX power / duty cycle
-   and use only the seconds needed.
-4. **Record** - Save before/after logs to `reports/` (git-ignored). Never
-   capture or store third-party traffic.
-5. **Cleanup** - Restore placeholder SSIDs (`lab-*`), MACs (`00:11:22:33:44:55`),
-   example.com / RFC5737 addresses, and clear any captured data from the device.
-
-> Jammer / spoofer / replay projects are **proofs for study and simulation**
-> only. They refuse live interference scenarios: a live bench trigger requires
-> the `LAB_*` allowlist environment variable AND explicit `--yes` confirmation,
-> and even then only against your own hardware in a shielded bench.
-
-## Metrics
-
-| Metric | Target | Where |
-|---|---|---|
-| Firmware compile | `arduino-cli compile --fqbn esp32:esp32:esp32 firmware/h8_rfid_spoofer` PASS | CI/local |
-| Host helper | `python3 host/h8_cli.py --demo` exits 0 (offline) | host/ |
-| Unit tests | `python3 -m unittest discover -s tests` passes | tests/ |
-| py_compile | every `host/*.py` compiles clean | CI/local |
+New card-family support, key search strategies and dump fixtures are welcome.
+Open an issue or PR against the default branch; keep contributions scoped to
+bench and simulation tooling.
 
 ## License
 
-MIT
+MIT — full legal shield in [LICENSE](LICENSE). Educational, authorization-
+required software for studying RFID on cards and systems you own in an
+isolated lab.
